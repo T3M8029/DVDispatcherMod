@@ -81,14 +81,21 @@ namespace DVDispatcherMod.DispatcherHintManagers {
 
             var foundTrackWithDistanceOrNull = Search(track.LogicTrack(), position);
             if (foundTrackWithDistanceOrNull != null) {
-                return $"{basicInfo}{Environment.NewLine}{foundTrackWithDistanceOrNull.Value.Track.ID.FullDisplayID} {foundTrackWithDistanceOrNull.Value.Distance}";
+                return $"{basicInfo}{Environment.NewLine}{foundTrackWithDistanceOrNull.Value.Track.ID.FullDisplayID} {foundTrackWithDistanceOrNull.Value.Distance}{Environment.NewLine} Distance from staation is {(loco.transform.position - StationController.GetStationByYardID(foundTrackWithDistanceOrNull.Value.Track.ID.yardId).transform.position).sqrMagnitude}";
             }
 
             return basicInfo;
         }
 
         private (Track Track, double Distance)? Search(Track track, double position) {
-            if (!track.ID.IsGeneric()) {
+            int searchIterations = 0;
+            //const int maxSearchIterations = 120;
+            var maxSearchIterations = Main.Settings.MaxSearchIterations;
+            if (track == null) return null;
+            Main.ModEntry.Logger.Log("Starting search for yard track with start at: " + track.ID.FullID);
+            var yardTracksAndDistance = new List<(Track track, double distance)>();
+            if (!track.ID.IsGeneric())
+            {
                 return (track, 0);
             }
 
@@ -99,26 +106,66 @@ namespace DVDispatcherMod.DispatcherHintManagers {
             fakeMinHeap.Add((new TrackSide { Track = track, IsStart = false }, track.length - position));
             fakeMinHeap.Sort((a, b) => a.Distance.CompareTo(b.Distance));
 
-            while (fakeMinHeap.Any()) {
+            while ((fakeMinHeap.Any()) && (searchIterations <= maxSearchIterations)) //the search needs to be clamped by something otherwise it could in some cases go to thousands
+            {
+                searchIterations++;
                 var (currentTrackSide, currentDistance) = fakeMinHeap.First();
+                Main.ModEntry.Logger.Log($"Search iteration {searchIterations - 1} at track {currentTrackSide.Track.ID.FullID} with distance {currentDistance}");
                 fakeMinHeap.RemoveAt(0);
-                if (!visited.Contains(currentTrackSide)) {
+                if (!visited.Contains(currentTrackSide))
+                {
                     visited.Add(currentTrackSide);
 
-                    if (!currentTrackSide.Track.ID.IsGeneric()) {
-                        return (currentTrackSide.Track, currentDistance);
+                    if (!currentTrackSide.Track.ID.IsGeneric())
+                    {
+                        yardTracksAndDistance.Add((currentTrackSide.Track, currentDistance));
                     }
 
                     var connectedTrackSides = GetConnectedTrackSides(currentTrackSide);
-                    foreach (var connectedTrackSide in connectedTrackSides) {
+                    foreach (var connectedTrackSide in connectedTrackSides)
+                    {
                         fakeMinHeap.Add((connectedTrackSide, currentDistance));
                     }
-                    fakeMinHeap.Add((currentTrackSide with { IsStart = !currentTrackSide.IsStart }, currentDistance + currentTrackSide.Track.length));
+                    //do not add same track twice
+                    if (!fakeMinHeap.Any(ts => ts.TrackSide.Track == currentTrackSide.Track )) fakeMinHeap.Add((currentTrackSide with { IsStart = !currentTrackSide.IsStart }, currentDistance + currentTrackSide.Track.length));
                     fakeMinHeap.Sort((a, b) => a.Distance.CompareTo(b.Distance));
                 }
             }
 
-            return null;
+            foreach (var TaD in yardTracksAndDistance.Where(TaD => TaD.distance > Main.Settings.MaxTrackDistance).ToList()) 
+            {
+                Main.ModEntry.Logger.Log($"Track distance for {TaD.track.ID.FullID} too big, skipping");
+                yardTracksAndDistance.Remove(TaD);
+            }
+
+            if (yardTracksAndDistance.Count == 0)
+            {
+                Main.ModEntry.Logger.Warning("No yard tracks found within search depth.");
+                return null;
+            }
+
+            // Remove military tracks that are far and return the closest yard track by searched path length
+            var farAwayMilTracks = new HashSet<(Track track, double distance)>();
+            yardTracksAndDistance.RemoveAll(consideredTrack =>
+            {
+                Main.ModEntry.Logger.Log($"Possible track {consideredTrack.track.ID.FullID} at length {consideredTrack.distance}");
+                bool isFarMil = (consideredTrack.track.ID.yardId == "HMB" || consideredTrack.track.ID.yardId == "MFMB") && consideredTrack.distance > Main.Settings.MilTrackDistance; //value needs tweaking -- 400 seems fine for mil yard influence
+                if (isFarMil)
+                {
+                    farAwayMilTracks.Add(consideredTrack);
+                }
+                return isFarMil;
+            });
+
+            if (yardTracksAndDistance.Count == 0 && farAwayMilTracks.Count > 0)
+            {
+                var fallback = farAwayMilTracks.OrderBy(t => t.distance).First();
+                Main.ModEntry.Logger.Log($"Returning military track {fallback.track.ID.FullID} at length {fallback.distance} since no other tracks are close enough");
+                return fallback;
+            }
+            var pickedTrack = yardTracksAndDistance.OrderBy(t => t.distance).First();
+            Main.ModEntry.Logger.Log($"Picked track {pickedTrack.track.ID.FullID} at lenght {pickedTrack.distance}");
+            return pickedTrack; 
         }
 
         private List<TrackSide> GetConnectedTrackSides(TrackSide currentTrackSide) {

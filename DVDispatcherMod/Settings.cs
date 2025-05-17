@@ -11,6 +11,15 @@ namespace DVDispatcherMod {
         [Draw("Enable debug logging of job structure")]
         public bool EnableDebugLoggingOfJobStructure = false;
 
+        [Draw("maxSearchIterations")]
+        public int MaxSearchIterations = 200;
+
+        [Draw("maxTrackDistance")]
+        public double MaxTrackDistance = 1000d;
+
+        [Draw("milTrackDeprioritizationDistance")]
+        public double MilTrackDistance = 400d;
+
         public override void Save(UnityModManager.ModEntry entry) {
             Save(this, entry);
         }
