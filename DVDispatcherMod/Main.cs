@@ -1,7 +1,9 @@
-﻿using System;
+﻿using DV.UI;
+using DV.Utils;
 using DVDispatcherMod.DispatcherHintManagers;
 using DVDispatcherMod.DispatcherHintShowers;
 using DVDispatcherMod.PlayerInteractionManagers;
+using System;
 using UnityModManagerNet;
 
 namespace DVDispatcherMod {
@@ -44,13 +46,19 @@ namespace DVDispatcherMod {
             return true;
         }
 
+        private static bool IsUIReady()
+        {
+            var canvas = SingletonBehaviour<ACanvasController<CanvasController.ElementType>>.Instance;
+            return canvas && canvas.NotificationManager != null;
+        }
+
         private static void OnUpdate(UnityModManager.ModEntry mod, float delta) {
             try {
                 if (IsModEnabledAndWorldReadyForInteraction()) {
                     _timer += delta;
 
                     if (_dispatcherHintManager == null) {
-                        if (_timer > SETUP_INTERVAL) {
+                        if (_timer > SETUP_INTERVAL && IsUIReady()) {
                             _timer %= SETUP_INTERVAL;
 
                             _dispatcherHintManager = TryCreateDispatcherHintManager();
@@ -60,11 +68,19 @@ namespace DVDispatcherMod {
                         }
                     }
 
-                    if (_dispatcherHintManager != null) {
-                        if (_timer > POINTER_INTERVAL) {
+                    if (_dispatcherHintManager != null)
+                    {
+                        // If UI disappeared (e.g., back to menu), dispose immediately
+                        if (!IsUIReady())
+                        {
+                            _dispatcherHintManager.Dispose();
+                            _dispatcherHintManager = null;
+                            ModEntry.Logger.Log("Disposed dispatcher hint manager (UI not ready).");
+                        }
+                        else if (_timer > POINTER_INTERVAL)
+                        {
                             _counter++;
                             _timer %= POINTER_INTERVAL;
-
                             _dispatcherHintManager.SetCounter(_counter);
                         }
                     }
@@ -94,6 +110,7 @@ namespace DVDispatcherMod {
         }
 
         private static DispatcherHintManager TryCreateDispatcherHintManager() {
+            if (!IsUIReady()) return null;
             if (VRManager.IsVREnabled()) {
                 var playerInteractionManager = VRPlayerInteractionManagerFactory.TryCreate();
                 if (playerInteractionManager == null) {

@@ -46,14 +46,10 @@
     <Reference Include="DV.Inventory">
       <Private>False</Private>
     </Reference>
-    <Reference Include="DV.PointSet, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\..\..\Games\Steam\steamapps\common\Derail Valley\DerailValley_Data\Managed\DV.PointSet.dll</HintPath>
+    <Reference Include="DV.PointSet">
       <Private>False</Private>
     </Reference>
-    <Reference Include="DV.RailTrack, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\..\..\..\Games\Steam\steamapps\common\Derail Valley\DerailValley_Data\Managed\DV.RailTrack.dll</HintPath>
+    <Reference Include="DV.RailTrack">
       <Private>False</Private>
     </Reference>
     <Reference Include="DV.Scenarios.CRUD">
@@ -106,6 +102,9 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityModManager">
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="VRTK">
       <Private>False</Private>
     </Reference>
   </ItemGroup>
